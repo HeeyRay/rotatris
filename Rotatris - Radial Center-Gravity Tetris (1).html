@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100 select-none">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Rotatris - Center Gravity Tetris</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      touch-action: manipulation;
+    }
+    body {
+      touch-action: none;
+      overflow: hidden;
+    }
+    .glow-cyan {
+      box-shadow: 0 0 25px rgba(0, 243, 255, 0.35);
+    }
+    .glow-text {
+      text-shadow: 0 0 10px rgba(0, 243, 255, 0.7);
+    }
+  </style>
+</head>
+<body class="h-full w-full flex items-center justify-center p-2 sm:p-4 bg-slate-950">
+
+  <!-- Main Container -->
+  <div class="w-full max-w-md h-full max-h-[920px] flex flex-direction flex-col items-center justify-between relative">
+    
+    <!-- Outer Top Bar -->
+    <div class="w-full flex items-center justify-between px-4 py-2 mb-1 bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-full text-xs font-semibold text-slate-400">
+      <div class="flex items-center gap-2 text-slate-100 font-extrabold tracking-wider">
+        <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_#00f3ff]"></span>
+        <span>ROTATRIS</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="btn-toggle-frame" class="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] border border-slate-700 transition-all active:scale-95">
+          Toggle Frame
+        </button>
+      </div>
+    </div>
+
+    <!-- iPhone 16 Pro Frame -->
+    <div id="iphone-frame" class="w-full flex-1 max-h-[840px] aspect-[9/19.5] bg-slate-900 rounded-[48px] p-2.5 border-[6px] border-slate-700 glow-cyan flex flex-col overflow-hidden relative transition-all duration-300">
+      <div class="w-full h-full bg-slate-950 rounded-[38px] flex flex-col justify-between overflow-hidden border border-slate-800/60 relative">
+        
+        <!-- Status Bar & Dynamic Island -->
+        <div class="w-full px-5 pt-2.5 pb-1 flex items-center justify-between text-xs font-semibold text-slate-300 z-20">
+          <span id="live-clock">12:00</span>
+          <div class="w-24 h-5 bg-black rounded-full flex items-center justify-end px-2 gap-1.5 border border-white/5">
+            <span class="w-2 h-2 rounded-full bg-indigo-950"></span>
+          </div>
+          <span class="text-[10px] text-slate-400">5G 100%</span>
+        </div>
+
+        <!-- Game Header Stats -->
+        <div class="w-full px-4 py-2 flex items-center justify-between bg-slate-900/90 backdrop-blur-md border-b border-slate-800 z-10">
+          <div>
+            <div class="text-[9px] font-bold text-slate-500 tracking-wider">SCORE</div>
+            <div id="score-val" class="text-lg font-black font-mono text-cyan-400 leading-none glow-text">0</div>
+            <div class="text-[9px] text-slate-400 mt-0.5">BEST: <span id="best-val">0</span></div>
+          </div>
+
+          <div class="flex items-center gap-3 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700/50">
+            <div class="text-center pr-2 border-r border-slate-700">
+              <div class="text-[8px] font-bold text-slate-400">LEVEL</div>
+              <div id="level-val" class="text-sm font-extrabold text-amber-400">1</div>
+            </div>
+            <div class="flex flex-col items-center">
+              <div class="text-[8px] font-bold text-slate-400 mb-0.5">NEXT</div>
+              <canvas id="next-canvas" width="28" height="28" class="w-7 h-7"></canvas>
+            </div>
+          </div>
+
+          <div class="flex gap-1.5">
+            <button id="btn-audio" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center text-xs active:scale-90">🔊</button>
+            <button id="btn-pause" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center text-xs active:scale-90">⏸</button>
+          </div>
+        </div>
+
+        <!-- Canvas Game Area -->
+        <div class="relative flex-1 w-full flex items-center justify-center p-1 overflow-hidden">
+          <canvas id="game-canvas" class="w-full h-full object-contain cursor-grab active:cursor-grabbing"></canvas>
+          
+          <div id="drag-hint" class="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-slate-900/90 backdrop-blur-md border border-cyan-500/40 text-[10px] font-semibold text-cyan-300 pointer-events-none shadow-lg transition-opacity duration-300">
+            👆 Touch & Drag wheel to rotate ↺
+          </div>
+
+          <!-- Overlay Screen -->
+          <div id="game-overlay" class="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-30 flex flex-col items-center justify-center p-6 text-center">
+            <h1 id="overlay-title" class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-2 tracking-wider">
+              ROTATRIS
+            </h1>
+            <p id="overlay-desc" class="text-xs text-slate-400 leading-relaxed mb-6 max-w-[260px]">
+              Tetrominoes fall inward towards the central core! Drag the wheel directly with your finger to rotate the base and clear concentric rings.
+            </p>
+            <button id="btn-start" class="w-full max-w-[200px] py-3 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-600 text-slate-950 font-black text-xs tracking-widest uppercase shadow-lg shadow-cyan-500/25 active:scale-95 transition-all">
+              START GAME
+            </button>
+          </div>
+        </div>
+
+        <!-- Control Dashboard -->
+        <div class="w-full p-2.5 bg-slate-900/90 backdrop-blur-md border-t border-slate-800 flex flex-col gap-2 z-10">
+          <!-- Rotation Row -->
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btn-spin-left" class="py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 font-bold text-xs flex items-center justify-center gap-1 active:scale-95 transition-all">
+              ↺ 90° LEFT
+            </button>
+            <button id="btn-spin-right" class="py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 font-bold text-xs flex items-center justify-center gap-1 active:scale-95 transition-all">
+              90° RIGHT ↻
+            </button>
+          </div>
+
+          <!-- Movement Row -->
+          <div class="grid grid-cols-5 gap-1.5">
+            <button id="btn-left" class="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-[10px] flex flex-col items-center justify-center active:scale-95">
+              <span class="text-xs">◄</span>
+              <span>LEFT</span>
+            </button>
+            <button id="btn-rotate" class="py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-400 font-bold text-[10px] flex flex-col items-center justify-center active:scale-95">
+              <span class="text-xs">↻</span>
+              <span>TURN</span>
+            </button>
+            <button id="btn-right" class="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-[10px] flex flex-col items-center justify-center active:scale-95">
+              <span class="text-xs">►</span>
+              <span>RIGHT</span>
+            </button>
+            <button id="btn-soft" class="py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-400 font-bold text-[10px] flex flex-col items-center justify-center active:scale-95">
+              <span class="text-xs">▼</span>
+              <span>DROP</span>
+            </button>
+            <button id="btn-hard" class="py-2 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-400 font-bold text-[10px] flex flex-col items-center justify-center active:scale-95">
+              <span class="text-xs">▼▼</span>
+              <span>SLAM</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- iPhone Home Bar -->
+        <div class="w-full h-3.5 bg-slate-950 flex items-center justify-center">
+          <div class="w-28 h-1 bg-slate-600/50 rounded-full"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * ROTATRIS - Radial Center Gravity Engine
+     */
+    class SoundSynthesizer {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playTone(freq, duration = 0.08, type = 'sine', vol = 0.12) {
+        if (this.muted || !this.ctx) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch(e) {}
+      }
+
+      playSpin() { this.playTone(340, 0.07, 'triangle', 0.15); }
+      playDrop() { this.playTone(180, 0.09, 'sine', 0.2); }
+      
+      playClear() {
+        if (this.muted || !this.ctx) return;
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+          setTimeout(() => this.playTone(freq, 0.14, 'triangle', 0.15), idx * 45);
+        });
+      }
+
+      playGameOver() {
+        if (this.muted || !this.ctx) return;
+        [220, 175, 130].forEach((freq, idx) => {
+          setTimeout(() => this.playTone(freq, 0.2, 'sawtooth', 0.15), idx * 90);
+        });
+      }
+    }
+
+    const sound = new SoundSynthesizer();
+
+    const TETROMINOES = {
+      I: { matrix: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#00f3ff', glow: 'rgba(0,243,255,0.8)' },
+      O: { matrix: [[1,1],[1,1]], color: '#ffea00', glow: 'rgba(255,234,0,0.8)' },
+      T: { matrix: [[0,1,0],[1,1,1],[0,0,0]], color: '#b000ff', glow: 'rgba(176,0,255,0.8)' },
+      S: { matrix: [[0,1,1],[1,1,0],[0,0,0]], color: '#00ff66', glow: 'rgba(0,255,102,0.8)' },
+      Z: { matrix: [[1,1,0],[0,1,1],[0,0,0]], color: '#ff0055', glow: 'rgba(255,0,85,0.8)' },
+      J: { matrix: [[1,0,0],[1,1,1],[0,0,0]], color: '#0066ff', glow: 'rgba(0,102,255,0.8)' },
+      L: { matrix: [[0,0,1],[1,1,1],[0,0,0]], color: '#ff7700', glow: 'rgba(255,119,0,0.8)' }
+    };
+    const PIECE_KEYS = Object.keys(TETROMINOES);
+    const GRID_SIZE = 14;
+    const CENTER = 6.5;
+
+    class Rotatris {
+      constructor() {
+        this.canvas = document.getElementById('game-canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.nextCanvas = document.getElementById('next-canvas');
+        this.nextCtx = this.nextCanvas.getContext('2d');
+
+        this.grid = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null));
+        this.initCore();
+
+        this.score = 0;
+        this.highScore = parseInt(localStorage.getItem('rotatris_hi') || '0');
+        this.level = 1;
+        this.linesCleared = 0;
+        this.gameState = 'START';
+
+        this.targetAngle = 0;
+        this.visualAngle = 0;
+        this.isDraggingWheel = false;
+        this.dragStartAngle = 0;
+        this.wheelBaseAngle = 0;
+
+        this.currentPiece = null;
+        this.nextPieceKey = null;
+
+        this.lastTime = 0;
+        this.dropCounter = 0;
+        this.dropInterval = 900;
+
+        this.particles = [];
+        this.floatingTexts = [];
+
+        this.initUI();
+        this.initPointerControls();
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+
+        document.getElementById('best-val').innerText = this.highScore;
+        requestAnimationFrame((t) => this.loop(t));
+      }
+
+      initCore() {
+        for (let r = 6; r <= 7; r++) {
+          for (let c = 6; c <= 7; c++) {
+            this.grid[r][c] = { isCore: true, color: '#1e293b' };
+          }
+        }
+      }
+
+      initUI() {
+        const updateClock = () => {
+          const d = new Date();
+          const h = String(d.getHours()).padStart(2, '0');
+          const m = String(d.getMinutes()).padStart(2, '0');
+          document.getElementById('live-clock').innerText = `${h}:${m}`;
+        };
+        updateClock();
+        setInterval(updateClock, 10000);
+
+        document.getElementById('btn-start').onclick = () => {
+          sound.init();
+          this.startNewGame();
+        };
+
+        document.getElementById('btn-pause').onclick = () => this.togglePause();
+
+        document.getElementById('btn-audio').onclick = (e) => {
+          sound.init();
+          sound.muted = !sound.muted;
+          e.target.innerText = sound.muted ? '🔇' : '🔊';
+        };
+
+        document.getElementById('btn-toggle-frame').onclick = () => {
+          document.getElementById('iphone-frame').classList.toggle('max-h-[840px]');
+          document.getElementById('iphone-frame').classList.toggle('aspect-[9/19.5]');
+          this.resize();
+        };
+
+        const bindBtn = (id, fn) => {
+          const btn = document.getElementById(id);
+          if (!btn) return;
+          btn.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            sound.init();
+            if (this.gameState === 'PLAYING') fn();
+          });
+        };
+
+        bindBtn('btn-spin-left', () => this.spinWheel(-1));
+        bindBtn('btn-spin-right', () => this.spinWheel(1));
+        bindBtn('btn-left', () => this.shiftPiece(-1));
+        bindBtn('btn-right', () => this.shiftPiece(1));
+        bindBtn('btn-rotate', () => this.rotatePiece());
+        bindBtn('btn-soft', () => this.softDrop());
+        bindBtn('btn-hard', () => this.hardDrop());
+
+        window.addEventListener('keydown', (e) => {
+          sound.init();
+          if (this.gameState !== 'PLAYING') return;
+
+          switch (e.code) {
+            case 'KeyA': this.spinWheel(-1); break;
+            case 'KeyD': this.spinWheel(1); break;
+            case 'ArrowLeft': this.shiftPiece(-1); break;
+            case 'ArrowRight': this.shiftPiece(1); break;
+            case 'ArrowUp': case 'KeyW': this.rotatePiece(); break;
+            case 'ArrowDown': case 'KeyS': this.softDrop(); break;
+            case 'Space': this.hardDrop(); break;
+          }
+        });
+      }
+
+      initPointerControls() {
+        const getAngle = (clientX, clientY) => {
+          const rect = this.canvas.getBoundingClientRect();
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height / 2;
+          return Math.atan2(clientY - cy, clientX - cx);
+        };
+
+        this.canvas.addEventListener('pointerdown', (e) => {
+          if (this.gameState !== 'PLAYING') return;
+          sound.init();
+
+          const rect = this.canvas.getBoundingClientRect();
+          const dist = Math.hypot(e.clientX - (rect.left + rect.width / 2), e.clientY - (rect.top + rect.height / 2));
+
+          if (dist <= this.wheelRadius + 20) {
+            this.isDraggingWheel = true;
+            this.dragStartAngle = getAngle(e.clientX, e.clientY);
+            this.wheelBaseAngle = this.targetAngle;
+            try { this.canvas.setPointerCapture(e.pointerId); } catch(err) {}
+
+            const hint = document.getElementById('drag-hint');
+            if (hint) hint.style.opacity = '0';
+          }
+        });
+
+        this.canvas.addEventListener('pointermove', (e) => {
+          if (!this.isDraggingWheel || this.gameState !== 'PLAYING') return;
+          const currentAngle = getAngle(e.clientX, e.clientY);
+          const delta = currentAngle - this.dragStartAngle;
+          this.targetAngle = this.wheelBaseAngle + delta;
+        });
+
+        const endDrag = (e) => {
+          if (!this.isDraggingWheel) return;
+          this.isDraggingWheel = false;
+          try { this.canvas.releasePointerCapture(e.pointerId); } catch(err) {}
+
+          const snap = Math.PI / 2;
+          this.targetAngle = Math.round(this.targetAngle / snap) * snap;
+          sound.playSpin();
+        };
+
+        this.canvas.addEventListener('pointerup', endDrag);
+        this.canvas.addEventListener('pointercancel', endDrag);
+      }
+
+      resize() {
+        const container = this.canvas.parentElement;
+        let w = container ? container.clientWidth : 320;
+        let h = container ? container.clientHeight : 320;
+        if (w === 0 || h === 0) { w = 320; h = 320; }
+
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const size = Math.min(w, h);
+
+        this.canvas.width = size * dpr;
+        this.canvas.height = size * dpr;
+        this.canvas.style.width = size + 'px';
+        this.canvas.style.height = size + 'px';
+
+        this.logicalSize = size;
+        this.dpr = dpr;
+        this.cx = size / 2;
+        this.cy = size / 2;
+        this.wheelRadius = (size / 2) * 0.90;
+        this.cellSize = (this.wheelRadius * 1.85) / GRID_SIZE;
+      }
+
+      isCellInsideWheel(gx, gy) {
+        const dx = (gx - CENTER + 0.5) * this.cellSize;
+        const dy = (gy - CENTER + 0.5) * this.cellSize;
+        return Math.hypot(dx, dy) <= this.wheelRadius;
+      }
+
+      spinWheel(dir) {
+        this.targetAngle += (dir * Math.PI / 2);
+        const snap = Math.PI / 2;
+        this.targetAngle = Math.round(this.targetAngle / snap) * snap;
+        sound.playSpin();
+      }
+
+      startNewGame() {
+        this.grid = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null));
+        this.initCore();
+
+        this.score = 0;
+        this.level = 1;
+        this.linesCleared = 0;
+        this.dropInterval = 900;
+        this.targetAngle = 0;
+        this.visualAngle = 0;
+        this.particles = [];
+        this.floatingTexts = [];
+
+        this.updateScoreDisplay();
+        this.nextPieceKey = PIECE_KEYS[Math.floor(Math.random() * PIECE_KEYS.length)];
+        this.spawnPiece();
+
+        this.gameState = 'PLAYING';
+        document.getElementById('game-overlay').classList.add('hidden');
+      }
+
+      togglePause() {
+        if (this.gameState === 'PLAYING') {
+          this.gameState = 'PAUSED';
+          document.getElementById('overlay-title').innerText = 'PAUSED';
+          document.getElementById('overlay-desc').innerText = 'Game paused. Tap resume to continue.';
+          document.getElementById('btn-start').innerText = 'RESUME';
+          document.getElementById('game-overlay').classList.remove('hidden');
+        } else if (this.gameState === 'PAUSED') {
+          this.gameState = 'PLAYING';
+          document.getElementById('game-overlay').classList.add('hidden');
+        }
+      }
+
+      gameOver() {
+        this.gameState = 'GAMEOVER';
+        sound.playGameOver();
+
+        if (this.score > this.highScore) {
+          this.highScore = this.score;
+          localStorage.setItem('rotatris_hi', this.highScore.toString());
+          document.getElementById('best-val').innerText = this.highScore;
+        }
+
+        document.getElementById('overlay-title').innerText = 'GAME OVER';
+        document.getElementById('overlay-desc').innerText = `Final Score: ${this.score} | Rings Cleared: ${this.linesCleared}`;
+        document.getElementById('btn-start').innerText = 'PLAY AGAIN';
+        document.getElementById('game-overlay').classList.remove('hidden');
+      }
+
+      spawnPiece() {
+        const key = this.nextPieceKey;
+        this.nextPieceKey = PIECE_KEYS[Math.floor(Math.random() * PIECE_KEYS.length)];
+        this.renderNextPiece();
+
+        const pData = TETROMINOES[key];
+        const matrix = pData.matrix.map(row => [...row]);
+
+        this.currentPiece = {
+          key: key,
+          matrix: matrix,
+          color: pData.color,
+          glow: pData.glow,
+          x: Math.floor((GRID_SIZE - matrix[0].length) / 2),
+          y: 0
+        };
+
+        if (this.checkCollision(this.currentPiece, 0, 0)) {
+          this.gameOver();
+        }
+      }
+
+      renderNextPiece() {
+        const ctx = this.nextCtx;
+        ctx.clearRect(0, 0, 28, 28);
+        if (!this.nextPieceKey) return;
+
+        const p = TETROMINOES[this.nextPieceKey];
+        const m = p.matrix;
+        const sz = 5;
+        const ox = (28 - m[0].length * sz) / 2;
+        const oy = (28 - m.length * sz) / 2;
+
+        ctx.fillStyle = p.color;
+        for (let r = 0; r < m.length; r++) {
+          for (let c = 0; c < m[r].length; c++) {
+            if (m[r][c]) {
+              ctx.fillRect(ox + c * sz, oy + r * sz, sz - 1, sz - 1);
+            }
+          }
+        }
+      }
+
+      shiftPiece(dir) {
+        if (!this.currentPiece) return;
+        if (!this.checkCollision(this.currentPiece, dir, 0)) {
+          this.currentPiece.x += dir;
+          sound.playTone(260, 0.04);
+        }
+      }
+
+      rotatePiece() {
+        if (!this.currentPiece) return;
+        const m = this.currentPiece.matrix;
+        const rotated = m.map((_, idx) => m.map(row => row[idx]).reverse());
+
+        if (!this.checkCollision({ ...this.currentPiece, matrix: rotated }, 0, 0)) {
+          this.currentPiece.matrix = rotated;
+          sound.playTone(320, 0.05);
+        }
+      }
+
+      softDrop() {
+        if (!this.currentPiece) return;
+        if (!this.checkCollision(this.currentPiece, 0, 1)) {
+          this.currentPiece.y += 1;
+          this.score += 1;
+          this.updateScoreDisplay();
+        } else {
+          this.lockPiece();
+        }
+      }
+
+      hardDrop() {
+        if (!this.currentPiece) return;
+        let drops = 0;
+        while (!this.checkCollision(this.currentPiece, 0, 1)) {
+          this.currentPiece.y += 1;
+          drops++;
+        }
+        this.score += drops * 2;
+        this.updateScoreDisplay();
+        this.lockPiece();
+      }
+
+      checkCollision(piece, dx, dy) {
+        const m = piece.matrix;
+        const snapAngle = Math.round(this.targetAngle / (Math.PI / 2)) * (Math.PI / 2);
+        const cos = Math.cos(-snapAngle);
+        const sin = Math.sin(-snapAngle);
+
+        for (let r = 0; r < m.length; r++) {
+          for (let c = 0; c < m[r].length; c++) {
+            if (m[r][c]) {
+              const sx = piece.x + c + dx;
+              const sy = piece.y + r + dy;
+
+              const relSx = sx - CENTER;
+              const relSy = sy - CENTER;
+
+              const gx = Math.round(CENTER + (relSx * cos - relSy * sin));
+              const gy = Math.round(CENTER + (relSx * sin + relSy * cos));
+
+              if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE) return true;
+              if (!this.isCellInsideWheel(gx, gy) || this.grid[gy][gx] !== null) return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      lockPiece() {
+        const p = this.currentPiece;
+        const m = p.matrix;
+        const snapAngle = Math.round(this.targetAngle / (Math.PI / 2)) * (Math.PI / 2);
+        const cos = Math.cos(-snapAngle);
+        const sin = Math.sin(-snapAngle);
+
+        for (let r = 0; r < m.length; r++) {
+          for (let c = 0; c < m[r].length; c++) {
+            if (m[r][c]) {
+              const sx = p.x + c;
+              const sy = p.y + r;
+
+              const relSx = sx - CENTER;
+              const relSy = sy - CENTER;
+
+              const gx = Math.round(CENTER + (relSx * cos - relSy * sin));
+              const gy = Math.round(CENTER + (relSx * sin + relSy * cos));
+
+              if (gy >= 0 && gy < GRID_SIZE && gx >= 0 && gx < GRID_SIZE) {
+                this.grid[gy][gx] = { color: p.color, glow: p.glow };
+                this.spawnParticles(gx, gy, p.color);
+              }
+            }
+          }
+        }
+
+        sound.playDrop();
+        this.checkRingClears();
+        this.spawnPiece();
+      }
+
+      checkRingClears() {
+        let clearedCount = 0;
+        const ringDistances = [1.5, 2.5, 3.5, 4.5, 5.5];
+
+        ringDistances.forEach((d) => {
+          let full = true;
+          let count = 0;
+
+          for (let r = 0; r < GRID_SIZE; r++) {
+            for (let c = 0; c < GRID_SIZE; c++) {
+              const dist = Math.max(Math.abs(r - CENTER), Math.abs(c - CENTER));
+              if (Math.abs(dist - d) < 0.2 && this.isCellInsideWheel(c, r)) {
+                count++;
+                if (!this.grid[r][c]) {
+                  full = false;
+                  break;
+                }
+              }
+            }
+            if (!full) break;
+          }
+
+          if (full && count > 0) {
+            clearedCount++;
+            this.clearRing(d);
+          }
+        });
+
+        if (clearedCount > 0) {
+          this.linesCleared += clearedCount;
+          const pts = [0, 400, 1000, 2200, 4000][Math.min(clearedCount, 4)] * this.level;
+          this.score += pts;
+          this.level = Math.floor(this.linesCleared / 4) + 1;
+          this.dropInterval = Math.max(150, 900 - (this.level - 1) * 75);
+
+          this.updateScoreDisplay();
+          sound.playClear();
+
+          this.floatingTexts.push({
+            text: `+${pts} RING CLEAR!`,
+            x: this.cx,
+            y: this.cy - 30,
+            alpha: 1.0
+          });
+        }
+      }
+
+      clearRing(targetDist) {
+        for (let r = 0; r < GRID_SIZE; r++) {
+          for (let c = 0; c < GRID_SIZE; c++) {
+            const dist = Math.max(Math.abs(r - CENTER), Math.abs(c - CENTER));
+            if (Math.abs(dist - targetDist) < 0.2 && this.grid[r][c] && !this.grid[r][c].isCore) {
+              this.spawnParticles(c, r, this.grid[r][c].color);
+              this.grid[r][c] = null;
+            }
+          }
+        }
+
+        for (let r = 0; r < GRID_SIZE; r++) {
+          for (let c = 0; c < GRID_SIZE; c++) {
+            const dist = Math.max(Math.abs(r - CENTER), Math.abs(c - CENTER));
+            if (dist > targetDist && this.grid[r][c] && !this.grid[r][c].isCore) {
+              const dr = Math.sign(CENTER - r);
+              const dc = Math.sign(CENTER - c);
+              const nr = r + dr;
+              const nc = c + dc;
+              if (!this.grid[nr][nc]) {
+                this.grid[nr][nc] = this.grid[r][c];
+                this.grid[r][c] = null;
+              }
+            }
+          }
+        }
+      }
+
+      updateScoreDisplay() {
+        document.getElementById('score-val').innerText = this.score;
+        document.getElementById('level-val').innerText = this.level;
+      }
+
+      spawnParticles(gx, gy, color) {
+        const px = this.cx + (gx - CENTER + 0.5) * this.cellSize;
+        const py = this.cy + (gy - CENTER + 0.5) * this.cellSize;
+
+        for (let i = 0; i < 6; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const spd = 1.5 + Math.random() * 3;
+          this.particles.push({
+            x: px, y: py,
+            vx: Math.cos(angle) * spd,
+            vy: Math.sin(angle) * spd,
+            size: 2 + Math.random() * 2,
+            color: color || '#00f3ff',
+            alpha: 1
+          });
+        }
+      }
+
+      loop(timestamp) {
+        const dt = timestamp - (this.lastTime || timestamp);
+        this.lastTime = timestamp;
+
+        if (this.gameState === 'PLAYING') {
+          this.dropCounter += dt;
+          if (this.dropCounter > this.dropInterval) {
+            this.softDrop();
+            this.dropCounter = 0;
+          }
+        }
+
+        this.visualAngle += (this.targetAngle - this.visualAngle) * 0.22;
+        this.render();
+        requestAnimationFrame((t) => this.loop(t));
+      }
+
+      render() {
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.scale(this.dpr, this.dpr);
+        ctx.clearRect(0, 0, this.logicalSize, this.logicalSize);
+
+        // 1. Outer Wheel Rim
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(this.cx, this.cy, this.wheelRadius, 0, Math.PI * 2);
+        ctx.fillStyle = '#0b1329';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0, 243, 255, 0.4)';
+        ctx.lineWidth = 3;
+        ctx.shadowColor = 'rgba(0, 243, 255, 0.5)';
+        ctx.shadowBlur = 10;
+        ctx.stroke();
+        ctx.restore();
+
+        // 2. Rotatable Grid & Landed Blocks
+        ctx.save();
+        ctx.translate(this.cx, this.cy);
+        ctx.rotate(this.visualAngle);
+
+        this.drawGridLines(ctx);
+        this.drawLandedBlocks(ctx);
+
+        ctx.restore();
+
+        // 3. Falling & Ghost Pieces
+        if (this.gameState === 'PLAYING' && this.currentPiece) {
+          this.drawGhostPiece(ctx);
+          this.drawFallingPiece(ctx);
+        }
+
+        // 4. Particle Effects
+        this.renderParticles(ctx);
+
+        ctx.restore();
+      }
+
+      drawGridLines(ctx) {
+        const sz = this.cellSize;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+        ctx.lineWidth = 1;
+
+        for (let r = 0; r <= GRID_SIZE; r++) {
+          for (let c = 0; c <= GRID_SIZE; c++) {
+            if (this.isCellInsideWheel(c, r)) {
+              const x = (c - CENTER) * sz;
+              const y = (r - CENTER) * sz;
+              ctx.strokeRect(x, y, sz, sz);
+            }
+          }
+        }
+      }
+
+      drawLandedBlocks(ctx) {
+        const sz = this.cellSize;
+        for (let r = 0; r < GRID_SIZE; r++) {
+          for (let c = 0; c < GRID_SIZE; c++) {
+            const cell = this.grid[r][c];
+            if (cell) {
+              const x = (c - CENTER) * sz;
+              const y = (r - CENTER) * sz;
+
+              if (cell.isCore) {
+                this.drawCoreTile(ctx, x, y, sz);
+              } else if (this.isCellInsideWheel(c, r)) {
+                this.drawSquareTile(ctx, x, y, sz, cell.color, cell.glow);
+              }
+            }
+          }
+        }
+      }
+
+      drawCoreTile(ctx, x, y, sz) {
+        ctx.save();
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(x + 1, y + 1, sz - 2, sz - 2);
+        ctx.strokeStyle = '#00f3ff';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(x + 1, y + 1, sz - 2, sz - 2);
+        ctx.restore();
+      }
+
+      drawFallingPiece(ctx) {
+        const p = this.currentPiece;
+        const m = p.matrix;
+        const sz = this.cellSize;
+
+        ctx.save();
+        for (let r = 0; r < m.length; r++) {
+          for (let c = 0; c < m[r].length; c++) {
+            if (m[r][c]) {
+              const sx = p.x + c;
+              const sy = p.y + r;
+              const px = this.cx + (sx - CENTER) * sz;
+              const py = this.cy + (sy - CENTER) * sz;
+              this.drawSquareTile(ctx, px, py, sz, p.color, p.glow);
+            }
+          }
+        }
+        ctx.restore();
+      }
+
+      drawGhostPiece(ctx) {
+        const p = this.currentPiece;
+        let ghostY = p.y;
+
+        while (!this.checkCollision({ ...p, y: ghostY }, 0, 1)) {
+          ghostY++;
+        }
+
+        const m = p.matrix;
+        const sz = this.cellSize;
+
+        ctx.save();
+        for (let r = 0; r < m.length; r++) {
+          for (let c = 0; c < m[r].length; c++) {
+            if (m[r][c]) {
+              const sx = p.x + c;
+              const sy = ghostY + r;
+              const px = this.cx + (sx - CENTER) * sz;
+              const py = this.cy + (sy - CENTER) * sz;
+              this.drawSquareTile(ctx, px, py, sz, 'rgba(255, 255, 255, 0.25)', 'transparent', 0.4);
+            }
+          }
+        }
+        ctx.restore();
+      }
+
+      drawSquareTile(ctx, x, y, sz, color, glow, opacity = 1.0) {
+        ctx.save();
+        ctx.globalAlpha = opacity;
+        ctx.fillStyle = color;
+        ctx.shadowColor = glow || color;
+        ctx.shadowBlur = 6;
+        ctx.fillRect(x + 1, y + 1, sz - 2, sz - 2);
+
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + 1, y + 1, sz - 2, sz - 2);
+        ctx.restore();
+      }
+
+      renderParticles(ctx) {
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+          const pt = this.particles[i];
+          pt.x += pt.vx;
+          pt.y += pt.vy;
+          pt.alpha -= 0.03;
+
+          if (pt.alpha <= 0) {
+            this.particles.splice(i, 1);
+            continue;
+          }
+
+          ctx.save();
+          ctx.globalAlpha = pt.alpha;
+          ctx.fillStyle = pt.color;
+          ctx.fillRect(pt.x, pt.y, pt.size, pt.size);
+          ctx.restore();
+        }
+
+        for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
+          const ft = this.floatingTexts[i];
+          ft.y -= 0.8;
+          ft.alpha -= 0.02;
+
+          if (ft.alpha <= 0) {
+            this.floatingTexts.splice(i, 1);
+            continue;
+          }
+
+          ctx.save();
+          ctx.globalAlpha = ft.alpha;
+          ctx.font = '800 12px sans-serif';
+          ctx.fillStyle = '#00f3ff';
+          ctx.textAlign = 'center';
+          ctx.fillText(ft.text, ft.x, ft.y);
+          ctx.restore();
+        }
+      }
+    }
+
+    window.addEventListener('load', () => {
+      new Rotatris();
+    });
+  </script>
+</body>
+</html>
